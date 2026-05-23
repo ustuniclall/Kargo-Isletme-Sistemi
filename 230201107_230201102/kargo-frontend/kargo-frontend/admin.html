@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel - Durak & Rota Yönetimi</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+
+        #map {
+            height: 450px;
+            width: 90%;
+            max-width: 1000px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            border: 2px solid #fff;
+            z-index: 1;
+        }
+
+        /* admin.html - CSS Güncellemesi */
+        .container {
+            display: flex;
+            gap: 20px;
+            width: 90%;
+            max-width: 900px;
+            /* Alttaki tablolarla aynı genişlik */
+            justify-content: space-between;
+            /* Kutuları iki yana yaslar */
+            flex-wrap: nowrap;
+            /* Yan yana kalmalarını zorunlu kılar */
+            margin-bottom: 25px;
+        }
+
+        .container .box {
+            flex: 1;
+            /* Her iki kutunun da eşit genişlikte olmasını sağlar */
+            width: auto;
+            /* Sabit genişliği kaldırarak flex'e bırakır */
+            margin: 0;
+            /* Dış boşlukları sıfırlar */
+        }
+
+        .box {
+            background: white;
+            padding: 15px;
+            flex: 1;
+            /* Kutuların eşit büyümesini sağlar */
+            min-width: 300px;
+            /* Çok küçülmelerini engeller */
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .params-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            /* Tam olarak iki sütun yapar */
+            gap: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .input-group input {
+            margin-bottom: 0;
+            /* Yan yana dururken boşluğu kaldır */
+            border-radius: 4px 0 0 4px;
+        }
+
+        .input-group button {
+            width: auto;
+            margin-bottom: 0;
+            border-radius: 0 4px 4px 0;
+            white-space: nowrap;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-assign {
+            background-color: #dc3545;
+        }
+
+        .btn-assign:hover {
+            background-color: #a71d2a;
+        }
+
+        .message {
+            margin-top: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: hidden;
+            /* Kaydırma çubuğunu kaldır */
+        }
+
+        #activePlansTable {
+            width: 100%;
+            /* Ekrana tam yayıl */
+            border-collapse: collapse;
+            font-size: 12px;
+            /* Yazıları biraz küçült ki sığsın */
+            table-layout: fixed;
+            /* Sütun genişliklerini sabitle */
+        }
+
+        #activePlansTable th,
+        #activePlansTable td {
+            padding: 8px 4px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            word-wrap: break-word;
+            /* Uzun kelimeleri alt satıra at */
+        }
+
+        /* Sütunlara özel genişlik ayarları */
+        .col-arac {
+            width: 12%;
+        }
+
+        .col-doluluk {
+            width: 15%;
+        }
+
+        .col-rota {
+            width: 30%;
+        }
+
+        .col-kargo {
+            width: 15%;
+        }
+
+        .col-maliyet {
+            width: 10%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🚚 Admin Panel – Durak & Rota Yönetimi</h1>
+
+    <div id="map"></div>
+
+    <div class="container">
+        <div class="box">
+            <h3>📍 Yeni Durak Ekle</h3>
+            <input type="text" id="newStationName" placeholder="Durak Adı">
+            <input type="number" id="newStationLat" step="0.0001" placeholder="Enlem (Lat)">
+            <input type="number" id="newStationLon" step="0.0001" placeholder="Boylam (Lon)">
+            <button class="btn-assign" onclick="addStation()">Durağı Kaydet</button>
+            <div id="stationMsg"></div>
+        </div>
+        <div class="box">
+            <h3>⚙️ Rota İşlemleri</h3>
+            <p><small>Planlanacak Tarihi Seçin:</small></p>
+            <input type="date" id="planDate" style="margin-bottom: 10px;">
+            <p><small>Tüm kargoları en uygun araçlara ata ve rotaları oluştur.</small></p>
+            <button class="btn-assign" onclick="assignCargos()">Rota Planlamasını Başlat</button>
+            <div class="message" id="assignMessage"></div>
+        </div>
+    </div>
+
+    <div class="box" style="width: 90%; max-width: 900px; margin-top: 20px; border-top: 4px solid #28a745;">
+        <h3>📊 Sefer Özet Raporu</h3>
+        <table>
+            <thead>
+                <tr style="background: #007bff; color: white;">
+                    <th>Araç</th>
+                    <th>Sefer Tarihi (Dağıtım)
+                    <th>Doluluk (Kullanılan/Kapasite)</th>
+                    <th>Güzergah</th>
+                    <th>Yakıt Maliyeti </th>
+                    <th>Kira Ücreti</th>
+                    <th>Araç Toplam</th>
+                </tr>
+            </thead>
+            <tbody id="summaryTableBody"></tbody>
+        </table>
+        <h4 id="totalCostDisplay" style="color: #dc3545; text-align: right; margin-top: 10px;"></h4>
+    </div>
+
+    <div class="box" style="width: 90%; max-width: 900px; margin-top: 20px; border-top: 4px solid #28a745;">
+        <h3>📜 Kesinleşmiş Sefer Detay Raporu</h3>
+        <div style="margin-bottom: 10px;">
+            <label>Rapor Tarihi Seçin:</label>
+            <input type="date" id="reportDate"> <button class="btn-assign" onclick="loadActivePlans()"
+                style="background: #28a745; display: inline-block; width: auto; padding: 5px 15px;">Planları
+                Yükle</button>
+        </div>
+
+        <div class="table-container">
+            <table id="activePlansTable">
+                <thead>
+                    <tr style="background: #218838; color: white;">
+                        <th class="col-arac">Araç</th>
+                        <th class="col-doluluk">Doluluk</th>
+                        <th class="col-rota">Güzergah (Tam)</th>
+                        <th class="col-kargo">Kargolar</th>
+                        <th class="col-maliyet">Yakıt</th>
+                        <th class="col-maliyet">Kira</th>
+                        <th class="col-maliyet">Toplam</th>
+                    </tr>
+                </thead>
+                <tbody id="activePlansBody"></tbody>
+                <tfoot id="activePlansFooter"
+                    style="background: #f8f9fa; font-weight: bold; border-top: 2px solid #218838;">
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="box" style="width: 90%; max-width: 900px; margin-top: 20px;">
+        <h3 style="border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px;">⚙️ Sistem Yönetim Paneli
+        </h3>
+
+        <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 300px;">
+                <h5 style="color: #007bff; margin-bottom: 15px;">💰 Maliyet Ayarları</h5>
+
+                <label style="font-size: 13px; font-weight: bold;">Yakıt (KM Başına):</label>
+                <div style="display: flex; margin-bottom: 15px;">
+                    <input type="number" id="fuelCost" style="margin-bottom: 0; border-radius: 4px 0 0 4px;">
+                    <button onclick="saveSetting('fuel_cost', 'fuelCost')"
+                        style="width: auto; margin-bottom: 0; border-radius: 0 4px 4px 0; padding: 0 15px;">Güncelle</button>
+                </div>
+
+                <label style="font-size: 13px; font-weight: bold;">Kiralama Ücreti:</label>
+                <div style="display: flex; margin-bottom: 15px;">
+                    <input type="number" id="rentalFee" style="margin-bottom: 0; border-radius: 4px 0 0 4px;">
+                    <button onclick="saveSetting('rental_fee', 'rentalFee')"
+                        style="width: auto; margin-bottom: 0; border-radius: 0 4px 4px 0; padding: 0 15px;">Güncelle</button>
+                </div>
+
+                <label style="font-size: 13px; font-weight: bold;">Ücretsiz Araç Sayısı:</label>
+                <div style="display: flex; margin-bottom: 15px;">
+                    <input type="number" id="freeVehicles" style="margin-bottom: 0; border-radius: 4px 0 0 4px;">
+                    <button onclick="saveSetting('free_vehicle_count', 'freeVehicles')"
+                        style="width: auto; margin-bottom: 0; border-radius: 0 4px 4px 0; padding: 0 15px;">Güncelle</button>
+                </div>
+            </div>
+
+            <div style="flex: 1; min-width: 300px;">
+                <h5 style="color: #28a745; margin-bottom: 15px;">🚚 Araç Kapasiteleri</h5>
+                <div id="vehicleSettingsList" style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = "http://localhost:8090";
+        let map;
+        let activePolylines = [];
+        const routeColors = {
+            "Büyük Araç": "#FF0000", "Orta Araç": "#0000FF", "Küçük Araç": "#008000",
+            "Kiralık-1": "#FFA500", "Kiralık-2": "#800080"
+        };
+
+        // 📍 Haritayı bir kez başlat
+        function initMap() {
+            if (map) return;
+            map = L.map('map').setView([40.8231, 29.9210], 11);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            L.marker([40.8231, 29.9210]).addTo(map).bindPopup('Merkez: Umuttepe').openPopup();
+        }
+        initMap();
+
+        function clearMapRoutes() {
+            activePolylines.forEach(layer => map.removeLayer(layer));
+            activePolylines = [];
+        }
+
+        /* admin.html - Durak Ekleme Fonksiyonu */
+        function addStation() {
+            const name = document.getElementById("newStationName").value;
+            const lat = document.getElementById("newStationLat").value;
+            const lon = document.getElementById("newStationLon").value;
+            const msg = document.getElementById("stationMsg");
+
+            if (!name || !lat || !lon) {
+                alert("Lütfen tüm alanları doldurun!");
+                return;
+            }
+
+            const stationData = {
+                name: name,
+                latitude: parseFloat(lat),
+                longitude: parseFloat(lon)
+            };
+
+            fetch(API + "/stations", { // Backend'deki StationController endpointi
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(stationData)
+            })
+                .then(response => {
+                    if (response.ok) {
+                        msg.style.color = "green";
+                        msg.innerText = "✅ Durak başarıyla eklendi!";
+
+                        // 📍 Haritaya yeni marker ekle
+                        L.marker([lat, lon]).addTo(map).bindPopup(name);
+
+                        // Formu temizle
+                        document.getElementById("newStationName").value = "";
+                        document.getElementById("newStationLat").value = "";
+                        document.getElementById("newStationLon").value = "";
+                    } else {
+                        throw new Error("Kayıt başarısız");
+                    }
+                })
+                .catch(err => {
+                    msg.style.color = "red";
+                    msg.innerText = "❌ Hata: Durak kaydedilemedi.";
+                });
+        }
+
+        /* admin.html - Yeni Yol Bağlantısı Kaydetme Fonksiyonu */
+        function saveRoad() {
+            const from = document.getElementById("roadFrom").value;
+            const to = document.getElementById("roadTo").value;
+            const dist = document.getElementById("roadDist").value;
+            const msg = document.getElementById("roadMsg");
+
+            if (!from || !to || !dist) {
+                alert("Lütfen tüm alanları doldurun!");
+                return;
+            }
+
+            // Backend'deki /stations/roads endpoint'ine gönderiyoruz
+            fetch(`${API}/stations/roads?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&dist=${dist}`, {
+                method: "POST"
+            })
+                .then(r => r.text())
+                .then(text => {
+                    msg.className = "message success";
+                    msg.innerText = "✅ " + text;
+                    // Formu temizle
+                    document.getElementById("roadFrom").value = "";
+                    document.getElementById("roadTo").value = "";
+                    document.getElementById("roadDist").value = "";
+                })
+                .catch(err => {
+                    msg.className = "message error";
+                    msg.innerText = "❌ Hata: Yol kaydedilemedi.";
+                    console.error(err);
+                });
+        }
+
+        function assignCargos() {
+            // 📍 tbody ve diğer elementleri fonksiyonun başında kesin olarak tanımlıyoruz
+            const tbody = document.getElementById("summaryTableBody");
+            const totalDisplay = document.getElementById("totalCostDisplay");
+            const planDate = document.getElementById("planDate").value;
+
+            const currentFuelRate = parseFloat(document.getElementById('fuelCost').value) || 1.0;
+            const currentRentalFee = parseFloat(document.getElementById('rentalFee').value) || 200.0;
+
+            if (!planDate) {
+                alert("Lütfen planlanacak tarihi seçin!");
+                return;
+            }
+
+            // 📅 Lojistik Kuralı: Seçilen tarihin bir gün sonrası sefere çıkılır.
+            let d = new Date(planDate);
+            d.setDate(d.getDate() + 1);
+            const deliveryDate = d.toLocaleDateString('tr-TR');
+
+            tbody.innerHTML = "<tr><td colspan='6'>⏳ Planlanıyor...</td></tr>";
+            clearMapRoutes();
+
+            // 📍 Tarih parametresini URL'ye ekliyoruz
+            fetch(`${API}/cargos/assign?date=${planDate}`, { method: "POST" })
+                .then(r => r.json())
+                .then(data => {
+                    console.log("Backend'den Gelen Veri:", data);
+                    tbody.innerHTML = "";
+
+                    // Backend'den assignmentPlans boş gelirse uyarı ver
+                    if (!data.assignmentPlans || data.assignmentPlans.length === 0) {
+                        tbody.innerHTML = "<tr><td colspan='6'>❌ Bu tarihte atanacak kargo bulunamadı.</td></tr>";
+                        return;
+                    }
+
+                    const allVehicles = [...data.mainVehicles, ...data.rentedVehicles];
+                    const drawnVehicles = new Set();
+
+                    allVehicles.forEach(v => {
+                        if (v.usedCapacityKg > 0) {
+                            const vehicleData = data.assignmentPlans.find(p => p.vehicle.name === v.name);
+
+                            if (vehicleData) {
+                                const routeString = vehicleData.routePath ? vehicleData.routePath.join(" → ") : "Rota Bilgisi Yok";
+                                const fuelCost = (vehicleData.vehicleTotalKm || 0) * currentFuelRate;
+                                const rentCost = v.rented ? currentRentalFee : 0;
+                                const rowTotal = fuelCost + rentCost;
+
+                                tbody.innerHTML += `
+<tr>
+    <td><b>${v.name}</b> ${v.rented ? '<small>(Kiralık)</small>' : ''}</td>
+    
+    <td style="color: #2563eb; font-weight: bold;">📅 ${deliveryDate}</td>
+    
+    <td>${v.usedCapacityKg.toFixed(2)} / ${v.capacityKg} kg</td>
+    
+    <td style="font-size: 0.85em;">📍 ${routeString}</td>
+    
+    <td>${fuelCost.toFixed(2)} Birim</td>
+    
+    <td>${rentCost} Birim</td>
+    
+    <td style="font-weight:bold; color:green;">${rowTotal.toFixed(2)} Birim</td>
+</tr>`;
+                                if (!drawnVehicles.has(v.name) && vehicleData.routeCoordinates) {
+                                    const poly = L.polyline(vehicleData.routeCoordinates, {
+                                        color: routeColors[v.name] || "#333",
+                                        weight: 5, opacity: 0.7, dashArray: v.rented ? "10, 10" : ""
+                                    }).addTo(map);
+                                    const vehicleMarker = L.marker(vehicleData.routeCoordinates[0]).addTo(map);
+                                    animateRoute(vehicleMarker, vehicleData.routeCoordinates);
+                                    activePolylines.push(poly);
+                                    drawnVehicles.add(v.name);
+                                }
+                            }
+                        }
+                    });
+                    totalDisplay.innerText = "💰 Genel Toplam Maliyet: " + data.totalCost.toFixed(2) + " Birim";
+                })
+                .catch(err => {
+                    console.error("Hata:", err);
+                    tbody.innerHTML = "<tr><td colspan='6' style='color:red'>❌ Hata: Rota verisi alınamadı.</td></tr>";
+                });
+
+            // Haritadaki aracı hareket ettirme fonksiyonu
+            function animateRoute(vehicleMarker, coordinates) {
+                let step = 0;
+                const interval = setInterval(() => {
+                    if (step >= coordinates.length) {
+                        clearInterval(interval);
+                        vehicleMarker.bindPopup("📦 Teslimat Tamamlandı!").openPopup();
+                        return;
+                    }
+                    // Marker'ı yeni koordinata taşı
+                    vehicleMarker.setLatLng(coordinates[step]);
+                    step++;
+                }, 1000); // Her 1 saniyede bir sonraki durağa geçer
+            }
+        }
+
+        /* admin.html içindeki istasyonları yükleyen kısmı bu fonksiyonla değiştirin */
+        function refreshStationsOnMap() {
+            // 📍 1. Haritadaki mevcut tüm durak işaretçilerini temizle (Umuttepe hariç)
+            map.eachLayer((layer) => {
+                if (layer instanceof L.Marker && layer.getPopup()?.getContent() !== 'Merkez: Umuttepe') {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // 📍 2. Güncel veriyi çek ve haritaya ekle
+            fetch(API + "/stations")
+                .then(r => r.json())
+                .then(data => {
+                    data.forEach(s => {
+                        L.marker([s.latitude, s.longitude]).addTo(map).bindPopup(s.name);
+                    });
+                });
+        }
+
+        // Sayfa yüklendiğinde çalıştır
+        refreshStationsOnMap();
+        function loadActivePlans() {
+            const reportDate = document.getElementById("reportDate").value; // 📍 Yeni tarih ID'si
+            const tbody = document.getElementById("activePlansBody");
+            const tfoot = document.getElementById("activePlansFooter");
+            const currentFuelRate = parseFloat(document.getElementById('fuelCost').value) || 1.0;
+            const currentRentalFee = parseFloat(document.getElementById('rentalFee').value) || 200.0;
+
+            if (!reportDate) { alert("Lütfen rapor tarihi seçin!"); return; }
+
+            fetch(`${API}/cargos/plans?date=${reportDate}`)
+                .then(r => r.json())
+                .then(data => {
+                    tbody.innerHTML = "";
+                    if (data.length === 0) {
+                        tbody.innerHTML = "<tr><td colspan='7'>Bu tarihte kayıtlı plan yok.</td></tr>";
+                        return;
+                    }
+
+                    let grandTotalMaliyet = 0; // 📍 Genel toplam sayacı
+
+                    const grouped = data.reduce((acc, c) => {
+                        const vName = c.vehicle.name;
+                        if (!acc[vName]) {
+                            acc[vName] = {
+                                name: vName,
+                                isRented: c.vehicle.rented,
+                                capacity: c.vehicle.capacityKg,
+                                totalW: 0,
+                                fullRoute: c.routePath,
+                                cargos: [],
+                                km: c.tripDistance || 0 // 📍 Backend'den gelen kaydedilmiş mesafe
+                            };
+                        }
+                        acc[vName].totalW += c.totalWeight;
+                        acc[vName].cargos.push("#" + c.id);
+                        return acc;
+                    }, {});
+
+                    Object.values(grouped).forEach(v => {
+                        const km = parseFloat(v.km) || 0; // Eğer 0 geliyorsa backend kaydı eksiktir
+                        const currentFuelRate = parseFloat(document.getElementById('fuelCost').value) || 1.0;
+                        const currentRentalFee = parseFloat(document.getElementById('rentalFee').value) || 200.0;
+
+                        const fuelCost = km * currentFuelRate;
+                        const rentCost = v.isRented ? currentRentalFee : 0;
+                        const totalForThisRow = fuelCost + rentCost;
+
+                        grandTotalMaliyet += totalForThisRow;
+
+                        tbody.innerHTML += `
+        <tr>
+            <td><b>${v.name}</b></td>
+            <td>${v.totalW.toFixed(1)} / ${v.capacity}</td>
+            <td style="font-size: 11px; text-align: left;">📍${v.fullRoute}</td>
+            <td>📦${v.cargos.join(", ")}</td>
+            <td>${fuelCost.toFixed(1)} B</td>
+            <td>${rentCost} B</td>
+            <td style="font-weight: bold; color: #155724;">${totalForThisRow.toFixed(1)} B</td>
+        </tr>`;
+                    });
+
+                    // 📍 3. Adım: Genel Toplam Satırını Footer'a Bas
+                    tfoot.innerHTML = `
+                <tr style="height: 40px;">
+                    <td colspan="6" style="text-align: right; padding-right: 20px;">GENEL TOPLAM MALİYET:</td>
+                    <td style="color: #d32f2f; font-size: 1.1em; border-left: 2px solid #218838;">
+                        ${grandTotalMaliyet.toFixed(2)} Birim
+                    </td>
+                </tr>`;
+                });
+        }
+
+        // 1. Ayarları Veritabanına Kaydet
+        function saveSetting(key, inputId) {
+            const val = document.getElementById(inputId).value;
+            fetch(`http://localhost:8090/settings/update?key=${key}&value=${val}`, { method: 'POST' })
+                .then(res => res.text())
+                .then(msg => {
+                    alert(msg);
+                    if (key === 'fuel_cost') {
+                        // 📍 Tablo başlıklarındaki (KM*1) yazılarını güncelle
+                        document.querySelectorAll("th").forEach(th => {
+                            if (th.innerText.includes("Yakıt Maliyeti")) th.innerText = `Yakıt Maliyeti (KM*${val})`;
+                        });
+                    }
+                    if (key === 'free_vehicle_count') loadVehicleSettings();
+                });
+        }
+
+        /* admin.html - loadVehicleSettings fonksiyonunu bu şekilde güncelleyin */
+        function loadVehicleSettings() {
+            Promise.all([
+                fetch("http://localhost:8090/vehicles").then(res => res.json()),
+                fetch("http://localhost:8090/settings").then(res => res.json())
+            ]).then(([vehicles, settings]) => {
+                const freeCount = parseInt(settings.free_vehicle_count);
+                const container = document.getElementById('vehicleSettingsList');
+                container.innerHTML = "";
+
+                // 📍 Eğer girilen sayı mevcut araçtan fazlaysa, eksik olanları DB'ye ekle
+                if (vehicles.length < freeCount) {
+                    const missingCount = freeCount - vehicles.length;
+                    createMissingVehicles(missingCount, vehicles.length);
+                    return; // Ekleme bittikten sonra bu fonksiyon tekrar tetiklenecek
+                }
+
+                // Listeyi oluştur
+                vehicles.slice(0, freeCount).forEach(v => {
+                    container.innerHTML += `
+                <div class="input-group mb-2 shadow-sm">
+                    <span class="input-group-text bg-light" style="width: 150px;">${v.name}</span>
+                    <input type="number" id="cap_${v.id}" class="form-control" value="${v.capacityKg}" placeholder="Kapasite (kg)">
+                    <button class="btn btn-outline-success" onclick="updateVehicleCapacity(${v.id}, '${v.name}')">
+                        💾 Kaydet
+                    </button>
+                </div>`;
+                });
+            });
+        }
+
+        // 📍 Yeni araç ekleme fonksiyonu
+        function createMissingVehicles(count, currentTotal) {
+            for (let i = 1; i <= count; i++) {
+                const newName = "Araç " + (currentTotal + i);
+                // Varsayılan 500kg ile yeni araç ekle
+                fetch(`http://localhost:8090/vehicles/add?name=${newName}&capacity=500`, { method: 'POST' })
+                    .then(() => {
+                        if (i === count) loadVehicleSettings(); // Hepsi bitince listeyi tazele
+                    });
+            }
+        }
+
+        // 📍 Ayarları kaydettiğimiz saveSetting fonksiyonuna şunu ekleyin:
+        function saveSetting(key, inputId) {
+            const val = document.getElementById(inputId).value;
+            fetch(`http://localhost:8090/settings/update?key=${key}&value=${val}`, { method: 'POST' })
+                .then(res => res.text())
+                .then(msg => {
+                    alert(msg);
+                    // Eğer değiştirilen ayar araç sayısıysa, listeyi hemen yenile!
+                    if (key === 'free_vehicle_count') loadVehicleSettings();
+                });
+        }
+
+        function updateVehicleCapacity(id, name) {
+            const cap = document.getElementById(`cap_${id}`).value;
+            fetch(`http://localhost:8090/vehicles/update-vehicle?id=${id}&name=${name}&capacity=${cap}`, { method: 'POST' })
+                .then(res => res.text())
+                .then(msg => alert(msg))
+                .catch(err => console.error("Araç güncellenemedi:", err));
+        }
+
+        // Sayfa açıldığında araçları yükle
+        loadVehicleSettings();
+
+        // admin.html içindeki script kısmına ekleyin
+        function loadCurrentSettings() {
+            fetch("http://localhost:8090/settings")
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('fuelCost').value = data.fuel_cost;
+                    document.getElementById('rentalFee').value = data.rental_fee;
+                    document.getElementById('freeVehicles').value = data.free_vehicle_count;
+                });
+        }
+
+        // Sayfa yüklendiğinde çalıştır
+        loadCurrentSettings();
+
+    </script>
+</body>
+
+</html>
