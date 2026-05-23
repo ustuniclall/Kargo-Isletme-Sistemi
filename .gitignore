@@ -1,0 +1,33 @@
+# --- Frontend (React / Web) İgnore Kuralları ---
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# --- Backend (Spring Boot / Java) İgnore Kuralları ---
+backend/target/
+backend/build/
+backend/out/
+backend/.gradle/
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+*.class
+*.jar
+*.war
+
+# --- IDE, Editor ve Sistem Dosyaları ---
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
