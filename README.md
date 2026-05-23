@@ -27,3 +27,9 @@ Sistem; `USER`, `CARGO`, `VEHICLE` ve `STATION` tabloları arasındaki ilişkise
 ## 👥 Geliştiriciler
 * **Merve Kübra ÖZTÜRK**
 * **İclal ÜSTÜN**
+
+## 📸 Ekran Görüntüleri
+
+![Giris Ekranı](giris_ekrani.png) ![Kullanici Paneli](kullanici_paneli.png) 
+![Kullanici Paneli](kullanici_paneli2.png) ![Admin Paneli](admin_paneli.png) 
+![Admin Paneli](admin_paneli2.png)
