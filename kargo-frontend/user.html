@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Kargo Sistemi - Kullanıcı Paneli</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial;
+            background: #eef2f5;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #map {
+            height: 400px;
+            width: 100%;
+            max-width: 1100px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            z-index: 1;
+        }
+
+        /* Yan yana dizilimi sağlayan yeni yapı */
+        .dashboard-grid {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button.secondary {
+            background: #28a745;
+        }
+
+        body {
+            font-family: Arial;
+            padding: 30px;
+            background: #eef2f5;
+        }
+
+        /* Harita Boyutu */
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border: 2px solid #ccc;
+            z-index: 1;
+        }
+
+        .box {
+            background: #fff;
+            padding: 20px;
+            width: 420px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button.secondary {
+            background: #28a745;
+        }
+
+        button:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+
+        ul {
+            padding-left: 18px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        small {
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>📍 Kargo Dağıtım Haritası</h2>
+    <div id="map"></div>
+
+    <div class="dashboard-grid">
+        <div class="column">
+            <div class="box">
+                <h3>🔑 Giriş (ID Al)</h3>
+                <input id="loginFirstName" placeholder="Ad">
+                <input id="loginLastName" placeholder="Soyad">
+                <button onclick="login()">Giriş Yap</button>
+                <div id="loginMsg"></div>
+            </div>
+
+            <div class="box">
+                <h3>📦 Kargo Gönder</h3>
+                <input id="sendUserId" type="number" placeholder="Kullanıcı ID">
+                <div style="display:flex; gap:10px;">
+                    <input id="sendFirstName" placeholder="Ad">
+                    <input id="sendLastName" placeholder="Soyad">
+                </div>
+                <select id="station"></select>
+                <input id="quantity" type="number" placeholder="Adet">
+                <input id="weight" type="number" placeholder="Ağırlık (kg)">
+                <input id="shipmentDate" type="date">
+                <button id="sendBtn" onclick="sendCargo()" disabled>Kargoyu Gönder</button>
+                <div id="sendMsg"></div>
+            </div>
+        </div>
+
+        <div class="column">
+            <div class="box" style="border-top: 4px solid #28a745;">
+                <h3>🔍 Kargolarımı Sorgula</h3>
+                <input id="viewUserId" type="number" placeholder="Kullanıcı ID">
+                <input id="viewFirstName" placeholder="Ad">
+                <input id="viewLastName" placeholder="Soyad">
+                <button class="secondary" onclick="loadMyCargos()">Kargolarımı Getir</button>
+            </div>
+
+            <div class="box">
+                <h3>📜 Aktif Kargolarınız</h3>
+                <ul id="cargoList" style="list-style:none; padding:0;"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = "http://localhost:8090";
+
+        // 1. Haritayı Umuttepe (Merkez) odaklı başlat
+        var map = L.map('map').setView([40.8231, 29.9210], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Umuttepe'ye ana marker koy
+        L.marker([40.8231, 29.9210]).addTo(map)
+            .bindPopup('<b>Umuttepe Kargo Merkezi</b>')
+            .openPopup();
+
+        /* ================= STATION & MAP MARKERS ================= */
+        fetch(API + "/stations")
+            .then(r => r.json())
+            .then(data => {
+                const stationSelect = document.getElementById("station");
+                stationSelect.innerHTML = "";
+                data.forEach(s => {
+                    // Select listesini doldur
+                    stationSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+
+                    // Haritaya ilçeleri marker olarak ekle
+                    L.marker([s.latitude, s.longitude]).addTo(map)
+                        .bindPopup(`<b>${s.name} İstasyonu</b>`);
+                });
+            });
+
+        /* ================= LOGIN ================= */
+        function login() {
+            const f = loginFirstName.value.trim();
+            const l = loginLastName.value.trim();
+
+            if (!f || !l) {
+                loginMsg.innerText = "Ad ve soyad zorunludur";
+                return;
+            }
+
+            fetch(API + "/users/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ firstName: f, lastName: l })
+            })
+                .then(r => r.json())
+                .then(u => {
+                    loginMsg.innerText = `Giriş başarılı. Kullanıcı ID: ${u.id}`;
+                    sendUserId.value = u.id;
+                    sendFirstName.value = u.firstName;
+                    sendLastName.value = u.lastName;
+                    sendBtn.disabled = false;
+                })
+                .catch(() => loginMsg.innerText = "Giriş hatası");
+        }
+
+        /* ================= KARGO GÖNDER ================= */
+        function sendCargo() {
+            const uid = sendUserId.value.trim();
+            const fn = sendFirstName.value.trim();
+            const ln = sendLastName.value.trim();
+
+            if (!uid || !fn || !ln) {
+                sendMsg.innerText = "ID, ad ve soyad zorunludur";
+                return;
+            }
+
+            fetch(API + `/users/verify?userId=${uid}&firstName=${fn}&lastName=${ln}`)
+                .then(r => r.json())
+                .then(ok => {
+                    if (!ok) {
+                        sendMsg.innerText = "❌ ID, ad veya soyad uyuşmuyor";
+                        return;
+                    }
+
+                    fetch(API + "/cargos/send", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            userId: uid,
+                            firstName: fn,
+                            lastName: ln,
+                            stationId: document.getElementById("station").value,
+                            quantity: document.getElementById("quantity").value,
+                            totalWeight: document.getElementById("weight").value, // Backend'e toplam ağırlık olarak gönderiliyor
+                            shipmentDate: document.getElementById("shipmentDate").value // 📍 Tarihi backend'e gönderiyoruz
+                        })
+                    })
+                        .then(r => r.text())
+                        .then(t => sendMsg.innerText = t)
+                        .catch(() => sendMsg.innerText = "Kargo gönderilemedi");
+                })
+                .catch(() => sendMsg.innerText = "Doğrulama hatası");
+        }
+
+        /* ================= KARGO SORGULA ================= */
+        function loadMyCargos() {
+            const uid = viewUserId.value.trim();
+            const fn = viewFirstName.value.trim();
+            const ln = viewLastName.value.trim();
+
+            if (!uid || !fn || !ln) {
+                alert("ID, ad ve soyad zorunludur");
+                return;
+            }
+            // 📍 YENİ: Haritadaki eski kullanıcı rotasını temizle
+            if (window.userPolyline) {
+                map.removeLayer(window.userPolyline);
+                window.userPolyline = null;
+            }
+
+            fetch(API + `/cargos/my?userId=${uid}&firstName=${fn}&lastName=${ln}`)
+                .then(r => r.json())
+                .then(list => {
+                    const listContainer = document.getElementById("cargoList");
+                    listContainer.innerHTML = "";
+
+                    list.forEach(c => {
+                        let d = new Date(c.shipmentDate);
+                        d.setDate(d.getDate() + 1);
+                        const arrivalDate = d.toLocaleDateString('tr-TR'); // GG.AA.YYYY formatı
+
+                        const vehicleInfo = c.vehicle ? c.vehicle.name : "Henüz Atanmadı";
+                        const routeInfo = c.routePath ? c.routePath : "Rota Hesaplanıyor";
+
+                        listContainer.innerHTML += `
+                <li style="border-bottom: 1px solid #ccc; padding: 10px;">
+                    <b>📦 Kargo #${c.id}</b><br>
+                    <span style="color: #d32f2f; font-weight: bold;">🚚 Planlanan Sefer: ${arrivalDate}</span><br> <small>Durum: ${c.assigned ? "✅ Yolda" : "🕒 Beklemede"}</small> |
+                    <small>Araç: ${vehicleInfo}</small><br>
+                    <small>Güzergah: ${routeInfo}</small><br>
+                    ${c.assigned ? `<button onclick='showUserRouteOnMap(${JSON.stringify(c.routeCoordinates)})' 
+                        style="width:auto; padding:5px 10px; margin-top:5px; background:#28a745;">
+                        🗺️ Haritada Gör</button>` : ""}
+                </li>`;
+                    });
+                });
+        }
+
+        // 📍 YENİ: Seçilen kargonun rotasını haritaya çizen fonksiyon
+        let activeUserPolyline = null;
+        // user.html içine eklenecek harita çizim fonksiyonu
+        function showUserRouteOnMap(coordsStr) {
+            if (!coordsStr) {
+                alert("Bu kargo için henüz rota oluşturulmamış.");
+                return;
+            }
+
+            // "lat,lon|lat,lon" formatını Leaflet'in anlayacağı [[lat,lon], [lat,lon]] formatına çevir
+            const coordArray = coordsStr.split('|').map(pair => {
+                const [lat, lon] = pair.split(',');
+                return [parseFloat(lat), parseFloat(lon)];
+            });
+
+            // Varsa eski kullanıcı rotasını temizle
+            if (window.userPolyline) map.removeLayer(window.userPolyline);
+
+            // Yeni rotayı çiz
+            window.userPolyline = L.polyline(coordArray, {
+                color: 'blue',
+                weight: 4,
+                opacity: 0.7
+            }).addTo(map);
+
+            // Haritayı bu rotaya odakla
+            map.fitBounds(window.userPolyline.getBounds());
+        }
+    </script>
+
+</body>
+
+</html>
